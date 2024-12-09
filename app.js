@@ -4,15 +4,16 @@ const mysql = require('mysql'); // Se connecter à la DB
 const cors = require('cors'); // gérer  API
 const path = require('path'); // pour def le chemin
 const router = express.Router();
-
+const Stripe = require('stripe');
 
 require('dotenv').config({ path: './info.env' }); // pour eviter les problèmes de chemins
 
 const app = express();
+const stripe = Stripe('sk_test_51QPq4BF4cmnoEMxGc0F5ozEQiQvHaGI0Hk0SG3qQjCG4Z5zAJg2ojdlSsI2OJPkZ2mD2lWqkiT0J4T0r1D3DgVA200Sf6M5RdY');
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());
-app.use(express.json()); 
+app.use(express.json());
 
 app.use(express.urlencoded({ extended: true }));
 
@@ -68,7 +69,7 @@ app.post('/register', async (req, res) => {
         // hachage du mdp
         const saltRounds = 10; // nombre de rounds de salage
         const hashedPassword = await bcrypt.hash(password, saltRounds);
-        
+
         console.log("Mot de passe original :", password);
         console.log("Mot de passe haché :", hashedPassword);
 
@@ -125,7 +126,25 @@ app.post('/login', async (req, res) => {
     });
 });
 
+// Route pour créer un paiement
+app.post('/create-payment-intent', async (req, res) => {
+    const { amount } = req.body;
 
+    try {
+        // Créer un PaymentIntent avec le montant dynamique
+        const paymentIntent = await stripe.paymentIntents.create({
+            amount: amount, // Montant en centimes
+            currency: 'eur', // Devise
+        });
+
+        // Retourner le clientSecret pour finaliser le paiement
+        res.json({
+            clientSecret: paymentIntent.client_secret,
+        });
+    } catch (error) {
+        res.status(500).send({ error: error.message });
+    }
+});
 // route DELETE pour supprimer un utilisateur (admin uniquement)
 
 app.delete('/delete-user/:id', checkAdminRole, (req, res) => {
@@ -174,7 +193,7 @@ app.get('/api/products', (req, res) => {
             console.error('Erreur lors de la récupération des produits:', err);
             return res.status(500).json({ message: 'Erreur lors de la récupération des produits' });
         }
-        res.status(200).json(result);  
+        res.status(200).json(result);
     });
 });
 
@@ -210,7 +229,7 @@ app.get('/api/products/:id', (req, res) => {
             return res.status(404).json({ message: 'Produit non trouvé' });
         }
 
-        res.status(200).json(result[0]);  
+        res.status(200).json(result[0]);
     });
 });
 
@@ -376,12 +395,12 @@ app.post('/create-order', (req, res) => {
         res.json({ message: 'Commande créée avec succès!', orderId: results.insertId });
     });
 });
-       
+
 
 // route pour récupérer les commandes côté admin
 app.get('/api/orders', (req, res) => {
 
-    const { sort } = req.query; 
+    const { sort } = req.query;
 
     let orderBy = 'created_at DESC'; // tri par defaut - les commandes les plus recentes 
     if (sort === 'created_at_asc') orderBy = 'created_at ASC';

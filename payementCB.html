@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Paiement avec Stripe</title>
+    <script src="https://js.stripe.com/v3/"></script> <!-- Stripe JS -->
+    <link rel="stylesheet" href="payement.css">
+</head>
+
+<body>
+    <header>
+        <h1>Informations Bancaires</h1>
+    </header>
+    <main>
+        <form id="payment-form">
+            <div id="card-element">
+                <!-- Le champ Stripe pour la carte sera ici -->
+            </div>
+            <div id="card-errors" role="alert"></div>
+            <button id="submit-button">Payer</button>
+        </form>
+    </main>
+    <footer>
+        <p>&copy; 2024 L'Arbre En Vie - Tous droits réservés</p>
+    </footer>
+    <script>
+        // Configuration de Stripe
+        const stripe = Stripe('pk_test_51QPq4BF4cmnoEMxG5hIqP2koZrTdibvkMtlZDmxjZEp0V0G0vahcJx4qK1pDTWa4Hie0bQPuP2qZWjC5n04ms4YE00WijlTE2i');
+        const elements = stripe.elements();
+
+        // Style des éléments de la carte
+        const style = {
+            base: {
+                color: '#32325d',
+                fontFamily: '"Helvetica Neue", Helvetica, sans-serif',
+                fontSize: '16px',
+                '::placeholder': {
+                    color: '#aab7c4'
+                }
+            },
+            invalid: {
+                color: '#fa755a',
+                iconColor: '#fa755a'
+            }
+        };
+
+        // Création de l'élément de carte
+        const card = elements.create('card', { style: style });
+        card.mount('#card-element');
+
+        // Gestion des erreurs
+        card.on('change', function (event) {
+            const displayError = document.getElementById('card-errors');
+            if (event.error) {
+                displayError.textContent = event.error.message;
+            } else {
+                displayError.textContent = '';
+            }
+        });
+
+        function calculateTotal() {
+            // Exemple : récupération des articles du panier depuis le localStorage
+            const cart = JSON.parse(localStorage.getItem('cart')) || [];
+            const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0); // Prix total en euros
+            return Math.round(total * 100); // Convertir en centimes
+        }
+
+
+        // Soumettre le formulaire de paiement
+        const form = document.getElementById('payment-form');
+        form.addEventListener('submit', async function (event) {
+            event.preventDefault();
+
+            const amount = calculateTotal(); // Calculer le montant dynamique
+
+            // Créer un PaymentMethod avec les données de carte
+            const { paymentMethod, error } = await stripe.createPaymentMethod({
+                type: 'card',
+                card: card,
+            });
+
+            if (error) {
+                // Afficher l'erreur si elle existe
+                const errorElement = document.getElementById('card-errors');
+                errorElement.textContent = error.message;
+            } else {
+                // Envoie le paymentMethod.id au serveur pour créer un PaymentIntent
+                const paymentMethodId = paymentMethod.id;
+
+                // Effectuer une requête POST au serveur pour créer un PaymentIntent
+                const response = await fetch('http://localhost:3000/create-payment-intent', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ amount: amount }), // Envoyer le montant calculé
+                });
+
+                const paymentIntentResponse = await response.json();
+
+                if (paymentIntentResponse.clientSecret) {
+                    const { clientSecret } = paymentIntentResponse;
+
+                    // Finaliser le paiement
+                    const { error: confirmError, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
+                        payment_method: paymentMethod.id,
+                    });
+
+                    if (confirmError) {
+                        // Afficher l'erreur de confirmation
+                        document.getElementById('card-errors').textContent = confirmError.message;
+                    } else {
+                        // Le paiement a réussi
+                        alert('Paiement effectué avec succès!');
+                        window.location.href = "accueil.html";  // Rediriger vers la page d'accueil
+                    }
+                } else {
+                    document.getElementById('card-errors').textContent = 'Erreur lors de la création du paiement.';
+                }
+            }
+        });
+    </script>
+</body>
+
+</html>
