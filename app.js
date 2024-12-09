@@ -9,7 +9,7 @@ const Stripe = require('stripe');
 require('dotenv').config({ path: './info.env' }); // pour eviter les problèmes de chemins
 
 const app = express();
-const stripe = Stripe('sk_test_51QPq4BF4cmnoEMxGc0F5ozEQiQvHaGI0Hk0SG3qQjCG4Z5zAJg2ojdlSsI2OJPkZ2mD2lWqkiT0J4T0r1D3DgVA200Sf6M5RdY');
+const stripe = Stripe('process.env.STRIPE_SECRET_KEY');
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());
