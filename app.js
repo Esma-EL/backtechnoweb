@@ -2,6 +2,7 @@ require('dotenv').config(); // pour charger les informations de info.env
 const express = require('express'); // créer et gérer le serveur web
 const mysql = require('mysql'); // Se connecter à la DB
 const cors = require('cors'); // gérer  API
+const nodemailer = require('nodemailer'); // pour l'envoi des emails
 const path = require('path'); // pour def le chemin
 const router = express.Router();
 const Stripe = require('stripe');
@@ -9,7 +10,7 @@ const Stripe = require('stripe');
 require('dotenv').config({ path: './info.env' }); // pour eviter les problèmes de chemins
 
 const app = express();
-const stripe = Stripe('process.env.STRIPE_SECRET_KEY');
+const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());
@@ -37,6 +38,9 @@ db.connect((err) => {
     }
     console.log('Connexion réussie à la DB de MySQL');
 });
+
+
+
 
 // test serveur
 app.get('/', (req, res) => {
@@ -438,6 +442,87 @@ app.get('/api/orders', (req, res) => {
         res.json(formattedResults);
     });
 });
+
+
+/// Fonction utilitaire pour configurer le transporteur Nodemailer
+const createTransporter = () => {
+    return nodemailer.createTransport({
+        host: 'smtp.mail.yahoo.com',
+        port: 465,
+        secure: true, // SSL/TLS
+        auth: {
+            user: process.env.EMAIL_USER,
+            pass: process.env.EMAIL_PASS,
+        },
+    });
+};
+
+// Fonction pour envoyer un email
+const sendEmail = async (toEmail, subject, message) => {
+    try {
+        const transporter = createTransporter();
+        const mailOptions = {
+            from: process.env.EMAIL_USER,
+            to: toEmail,
+            subject,
+            text: message,
+        };
+        await transporter.sendMail(mailOptions);
+        console.log(`Email envoyé à ${toEmail}`);
+    } catch (error) {
+        console.error("Erreur lors de l'envoi de l'email :", error);
+        throw error;
+    }
+};
+
+// Endpoint pour valider une commande
+app.post('/validate-order', (req, res) => {
+    const { userId, totalPrice, cartItems } = req.body;
+
+    if (!userId || !totalPrice || !cartItems || !Array.isArray(cartItems) || cartItems.length === 0) {
+        return res.status(400).json({ message: "Tous les champs (userId, totalPrice, cartItems) sont requis." });
+    }
+
+    // Étape 1 : Ajouter la commande à la table "orders"
+    const insertOrderQuery = 'INSERT INTO orders (user_id, total_price, cart_items) VALUES (?, ?, ?)';
+    db.query(insertOrderQuery, [userId, totalPrice, JSON.stringify(cartItems)], (err, result) => {
+        if (err) {
+            console.error("Erreur lors de l'ajout de la commande :", err);
+            return res.status(500).json({ message: "Erreur lors de l'ajout de la commande." });
+        }
+
+        console.log('Commande ajoutée avec succès.');
+
+        // Étape 2 : Récupérer l'email de l'utilisateur
+        const getEmailQuery = 'SELECT email FROM users WHERE id = ?';
+        db.query(getEmailQuery, [userId], async (err, results) => {
+            if (err) {
+                console.error("Erreur lors de la récupération de l'email utilisateur :", err);
+                return res.status(500).json({ message: "Erreur lors de la récupération de l'email utilisateur." });
+            }
+
+            if (results.length === 0) {
+                return res.status(404).json({ message: "Utilisateur introuvable." });
+            }
+
+            const email = results[0].email;
+
+            // Étape 3 : Configurer et envoyer l'email
+            const subject = 'Confirmation de commande';
+            const message = `Bonjour, votre commande d'un montant total de ${totalPrice} a été validée. Merci de votre achat !`;
+
+            try {
+                await sendEmail(email, subject, message);
+                console.log('Email envoyé avec succès.');
+                res.status(200).json({ message: 'Commande validée et email envoyé.' });
+            } catch (error) {
+                console.error("Erreur lors de l'envoi de l'email :", error);
+                res.status(500).json({ message: "Commande validée, mais erreur lors de l'envoi de l'email." });
+            }
+        });
+    });
+});
+
 
 
 // toujours à la fin

@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Order Details</title>
+    <style>
+        /* Styles généraux */
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f0f0f5;
+            color: #333;
+        }
+
+        /* Header */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #fff;
+            padding: 10px 20px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            position: sticky;
+            top: 0;
+            z-index: 999;
+        }
+
+        .logo img {
+            width: 60px;
+        }
+
+        .nav-menu {
+            display: flex;
+            list-style: none;
+            gap: 15px;
+            margin: 0;
+            padding: 0;
+        }
+
+        .nav-menu a {
+            text-decoration: none;
+            color: #333;
+            font-weight: bold;
+            transition: color 0.3s;
+        }
+
+        .nav-menu a:hover {
+            color: #4CAF50;
+        }
+
+        /* Contenu principal */
+        main {
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+            background: #fff;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            margin-top: 20px;
+        }
+
+        #order-details-section {
+            padding: 20px;
+            text-align: center;
+        }
+
+        #order-details-section h1 {
+            font-size: 2rem;
+            color: #4CAF50;
+            margin-bottom: 10px;
+        }
+
+        #order-details-section p {
+            font-size: 1rem;
+            margin-bottom: 20px;
+            color: #555;
+        }
+
+        /* Détails des articles */
+        .order-items {
+            text-align: left;
+            margin-bottom: 20px;
+        }
+
+        .order-item {
+            background-color: #f9f9f9;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .order-item p {
+            margin: 5px 0;
+            color: #555;
+        }
+
+        /* Boutons */
+        button,
+        .btn {
+            display: inline-block;
+            font-size: 1rem;
+            font-weight: bold;
+            padding: 10px 20px;
+            color: #fff;
+            background-color: #4CAF50;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        button:hover,
+        .btn:hover {
+            background-color: #3e8e41;
+            transform: scale(1.05);
+        }
+
+        /* Footer */
+        footer {
+            text-align: center;
+            padding: 15px;
+            background-color: #f9f9f9;
+            color: #666;
+            font-size: 0.9rem;
+            border-top: 1px solid #ddd;
+            margin-top: 20px;
+        }
+
+        /* Mode sombre */
+        body.dark-theme {
+            background-color: #121212;
+            color: #e0e0e0;
+        }
+
+        body.dark-theme main {
+            background-color: #1f1f1f;
+            color: #e0e0e0;
+        }
+
+        body.dark-theme .order-item {
+            background-color: #2a2a2a;
+        }
+
+        body.dark-theme button,
+        .btn {
+            background-color: #4CAF50;
+        }
+
+        body.dark-theme button:hover,
+        .btn:hover {
+            background-color: #3e8e41;
+        }
+
+        body.dark-theme footer {
+            background-color: #1f1f1f;
+            color: #e0e0e0;
+        }
+
+        /* Bouton du thème */
+        #theme-toggle {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+
+        #theme-toggle button {
+            background-color: #333;
+            color: white;
+            border: none;
+            padding: 15px;
+            border-radius: 50%;
+            font-size: 1.5rem;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            cursor: pointer;
+            transition: background-color 0.3s ease, transform 0.3s ease;
+        }
+
+        #theme-toggle button:hover {
+            background-color: #4CAF50;
+            transform: scale(1.1);
+        }
+    </style>
+</head>
+
+<body>
+    <section class="order-details">
+        <h1>Order Details</h1>
+        <div class="order-items">
+            <!-- Dynamic content will be injected here -->
+        </div>
+        <div class="order-total">
+            <h2>Total: <span id="total-price">$0.00</span></h2>
+        </div>
+        <button id="confirm-order">Confirm Order</button>
+        <button id="download-invoice">Download Invoice (PDF)</button>
+    </section>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.4.0/jspdf.umd.min.js"></script>
+    <script>
+        // Partie dynamique pour gérer l'affichage des articles du panier
+        document.addEventListener('DOMContentLoaded', function () {
+            const orderItemsContainer = document.querySelector('.order-items');
+            const totalPriceElement = document.getElementById('total-price');
+
+            // Récupération des articles du panier depuis le localStorage
+            const cart = JSON.parse(localStorage.getItem('cart')) || [];
+
+            // Initialisation du total
+            let total = 0;
+
+            // Génération dynamique des articles
+            cart.forEach(item => {
+                const itemElement = document.createElement('div');
+                itemElement.classList.add('order-item');
+                itemElement.innerHTML = `
+                    <p><strong>${item.name}</strong></p>
+                    <p>Price: $${item.price.toFixed(2)}</p>
+                    <p>Quantity: ${item.quantity}</p>
+                `;
+                orderItemsContainer.appendChild(itemElement);
+
+                // Mise à jour du total
+                total += item.price * item.quantity;
+            });
+
+            // Affichage du total
+            totalPriceElement.textContent = `$${total.toFixed(2)}`;
+
+            // Gestion de la confirmation de commande
+            const confirmButton = document.getElementById('confirm-order');
+            confirmButton.addEventListener('click', function () {
+                alert('Thank you for your order!');
+                localStorage.removeItem('cart'); // Vider le panier
+                location.reload(); // Recharger la page
+            });
+
+            // Génération de la facture PDF
+            const downloadInvoiceButton = document.getElementById('download-invoice');
+            downloadInvoiceButton.addEventListener('click', function () {
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF();
+
+                doc.setFontSize(18);
+                doc.text('Invoice', 105, 10, { align: 'center' });
+                doc.setFontSize(12);
+
+                let yPosition = 30;
+                cart.forEach(item => {
+                    doc.text(`${item.name} - $${item.price.toFixed(2)} x ${item.quantity}`, 10, yPosition);
+                    yPosition += 10;
+                });
+
+                doc.text(`Total: $${total.toFixed(2)}`, 10, yPosition + 10);
+
+                doc.save('invoice.pdf');
+            });
+        });
+    </script>
+</body>
+
+</html>
